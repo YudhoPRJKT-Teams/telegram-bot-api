@@ -13,53 +13,38 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: 'debian:bookworm'
     steps:
-      # 1. Checkout dasar (tanpa submodule dulu biar gak error)
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # 2. Pasang Git dan dependencies lainnya
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y git make zlib1g-dev libssl-dev gperf cmake clang libc++-dev libc++abi-dev ccache zip curl
-
-      # 3. Sekarang baru tarik submodulenya karena git sudah terpasang
-      - name: Init submodules
-        run: |
-          git submodule update --init --recursive
-
-      - name: Setup ccache Persistence
-        uses: actions/cache@v4
         with:
-          path: /root/.cache/ccache
-          key: '${{ runner.os }}-ccache-${{ github.run_id }}'
-          restore-keys: |
-            ${{ runner.os }}-ccache-
+          submodules: recursive
 
-      - name: Configure ccache
-        run: |
-          ccache -M 20G
-          ccache -s
-
-      - name: Build Process
-        run: |
-          mkdir -p build && cd build
-          CXXFLAGS="-stdlib=libc++" \
-          CC=/usr/bin/clang \
-          CXX=/usr/bin/clang++ \
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX:PATH=/usr/local \
-                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-                ..
-          cmake --build . --target install -- -j$(nproc)
-
-      - name: Package Binary
-        run: |
-          zip -j linux-telegram_bot_api.zip /usr/local/bin/telegram-bot-api
+      - name: Build in Debian Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: debian:bookworm
+          options: -v ${{ github.workspace }}:/work -v /root/.cache/ccache:/root/.cache/ccache
+          run: |
+            apt-get update
+            apt-get install -y make git zlib1g-dev libssl-dev gperf cmake clang libc++-dev libc++abi-dev ccache zip curl
+            
+            cd /work
+            
+            ccache -M 20G
+            mkdir -p build && cd build
+            
+            CXXFLAGS="-stdlib=libc++" \
+            CC=/usr/bin/clang \
+            CXX=/usr/bin/clang++ \
+            cmake -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX:PATH=/usr/local \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  ..
+            
+            cmake --build . --target install -- -j$(nproc)
+            
+            zip -j /work/linux-telegram_bot_api.zip /usr/local/bin/telegram-bot-api
 
       - name: Upload to GitHub Packages
         run: |
