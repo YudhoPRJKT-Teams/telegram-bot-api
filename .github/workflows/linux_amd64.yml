@@ -16,15 +16,20 @@ jobs:
     container:
       image: 'debian:bookworm'
     steps:
+      # 1. Checkout dasar (tanpa submodule dulu biar gak error)
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
+      # 2. Pasang Git dan dependencies lainnya
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y make git zlib1g-dev libssl-dev gperf cmake clang libc++-dev libc++abi-dev ccache zip curl
+          apt-get install -y git make zlib1g-dev libssl-dev gperf cmake clang libc++-dev libc++abi-dev ccache zip curl
+
+      # 3. Sekarang baru tarik submodulenya karena git sudah terpasang
+      - name: Init submodules
+        run: |
+          git submodule update --init --recursive
 
       - name: Setup ccache Persistence
         uses: actions/cache@v4
