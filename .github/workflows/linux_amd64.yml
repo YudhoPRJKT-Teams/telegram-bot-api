@@ -1,0 +1,73 @@
+name: Auto Build Telegram Bot API
+'on':
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch: 
+
+env:
+  PACKAGE_NAME: linux-telegram-bot-api
+  PACKAGE_VERSION: '1.0.${{ github.run_number }}'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: 'debian:bookworm'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y make git zlib1g-dev libssl-dev gperf cmake clang libc++-dev libc++abi-dev ccache zip curl
+
+      - name: Setup ccache Persistence
+        uses: actions/cache@v4
+        with:
+          path: /root/.cache/ccache
+          key: '${{ runner.os }}-ccache-${{ github.run_id }}'
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: Configure ccache
+        run: |
+          ccache -M 20G
+          ccache -s
+
+      - name: Build Process
+        run: |
+          mkdir -p build && cd build
+          CXXFLAGS="-stdlib=libc++" \
+          CC=/usr/bin/clang \
+          CXX=/usr/bin/clang++ \
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX:PATH=/usr/local \
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                ..
+          cmake --build . --target install -- -j$(nproc)
+
+      - name: Package Binary
+        run: |
+          zip -j linux-telegram_bot_api.zip /usr/local/bin/telegram-bot-api
+
+      - name: Upload to GitHub Packages
+        run: |
+          curl -X PUT \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/zip" \
+            --upload-file linux-telegram_bot_api.zip \
+            "https://maven.pkg.github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/com/yudhoprjkt/telegram-bot-api/${{ env.PACKAGE_VERSION }}/telegram-bot-api-${{ env.PACKAGE_VERSION }}.zip"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: linux-telegram_bot_api.zip
+          tag_name: 'v${{ env.PACKAGE_VERSION }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
