@@ -43,16 +43,7 @@ jobs:
                   ..
             
             cmake --build . --target install -- -j$(nproc)
-            
             zip -j /work/linux-telegram_bot_api.zip /usr/local/bin/telegram-bot-api
-
-      - name: Upload to GitHub Packages
-        run: |
-          curl -X PUT \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/zip" \
-            --upload-file linux-telegram_bot_api.zip \
-            "https://maven.pkg.github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/com/yudhoprjkt/telegram-bot-api/${{ env.PACKAGE_VERSION }}/telegram-bot-api-${{ env.PACKAGE_VERSION }}.zip"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
