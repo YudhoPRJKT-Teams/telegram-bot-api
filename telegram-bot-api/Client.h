@@ -115,6 +115,7 @@ class Client final : public WebhookActor::Callback {
   class JsonAudio;
   class JsonAudios;
   class JsonDocument;
+  class JsonLink;
   class JsonPhotoSize;
   class JsonPhoto;
   class JsonLivePhoto;
@@ -133,6 +134,7 @@ class Client final : public WebhookActor::Callback {
   class JsonDice;
   class JsonGame;
   class JsonInvoice;
+  class JsonLiveLocation;
   class JsonLocation;
   class JsonVenue;
   class JsonPollMedia;
@@ -152,6 +154,14 @@ class Client final : public WebhookActor::Callback {
   class JsonSuggestedPostRefunded;
   class JsonEntity;
   class JsonVectorEntities;
+  class JsonRichText;
+  class JsonRichBlock;
+  class JsonRichBlocks;
+  class JsonRichTableCell;
+  class JsonRichTableRow;
+  class JsonRichBlockCaption;
+  class JsonRichBlockListItem;
+  class JsonRichMessage;
   class JsonWebAppInfo;
   class JsonCopyTextButton;
   class JsonInlineKeyboardButton;
@@ -650,6 +660,10 @@ class Client final : public WebhookActor::Callback {
       td::string text, object_ptr<td_api::linkPreviewOptions> link_preview_options, td::string parse_mode,
       td::JsonValue &&input_entities);
 
+  static td::Result<object_ptr<td_api::inputRichMessage>> get_input_rich_message(const Query *query);
+
+  static td::Result<object_ptr<td_api::inputRichMessage>> get_input_rich_message(td::JsonValue &&value);
+
   static td::Result<object_ptr<td_api::location>> get_location(const Query *query);
 
   static td::Result<object_ptr<td_api::location>> get_location(const td::JsonObject &object);
@@ -679,12 +693,10 @@ class Client final : public WebhookActor::Callback {
 
   td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, td::Slice field_name) const;
 
-  td::Result<object_ptr<td_api::InputMessageContent>> get_input_poll_media(const Query *query,
-                                                                           td::JsonValue &&input_media,
-                                                                           bool for_option) const;
+  td::Result<object_ptr<td_api::InputPollMedia>> get_input_poll_media(const Query *query, td::JsonValue &&input_media,
+                                                                      bool for_option) const;
 
-  td::Result<object_ptr<td_api::InputMessageContent>> get_input_poll_media(const Query *query,
-                                                                           td::Slice field_name) const;
+  td::Result<object_ptr<td_api::InputPollMedia>> get_input_poll_media(const Query *query, td::Slice field_name) const;
 
   td::Result<td::vector<object_ptr<td_api::InputMessageContent>>> get_input_message_contents(
       const Query *query, td::Slice field_name) const;
@@ -794,6 +806,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_get_user_profile_photos_query(PromisedQueryPtr &query);
   td::Status process_get_user_profile_audios_query(PromisedQueryPtr &query);
   td::Status process_send_message_query(PromisedQueryPtr &query);
+  td::Status process_send_rich_message_query(PromisedQueryPtr &query);
   td::Status process_send_animation_query(PromisedQueryPtr &query);
   td::Status process_send_audio_query(PromisedQueryPtr &query);
   td::Status process_send_dice_query(PromisedQueryPtr &query);
@@ -820,6 +833,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_send_media_group_query(PromisedQueryPtr &query);
   td::Status process_send_chat_action_query(PromisedQueryPtr &query);
   td::Status process_send_message_draft_query(PromisedQueryPtr &query);
+  td::Status process_send_rich_message_draft_query(PromisedQueryPtr &query);
   td::Status process_set_message_reaction_query(PromisedQueryPtr &query);
   td::Status process_edit_message_text_query(PromisedQueryPtr &query);
   td::Status process_edit_message_live_location_query(PromisedQueryPtr &query);
@@ -856,6 +870,8 @@ class Client final : public WebhookActor::Callback {
   td::Status process_answer_web_app_query_query(PromisedQueryPtr &query);
   td::Status process_answer_guest_query_query(PromisedQueryPtr &query);
   td::Status process_answer_inline_query_query(PromisedQueryPtr &query);
+  td::Status process_answer_chat_join_request_query_query(PromisedQueryPtr &query);
+  td::Status process_send_chat_join_request_web_app_query(PromisedQueryPtr &query);
   td::Status process_save_prepared_inline_message_query(PromisedQueryPtr &query);
   td::Status process_save_prepared_keyboard_button_query(PromisedQueryPtr &query);
   td::Status process_answer_callback_query_query(PromisedQueryPtr &query);
@@ -1070,6 +1086,7 @@ class Client final : public WebhookActor::Callback {
     bool has_topics = false;
     bool allows_users_to_create_topics = false;
     bool can_manage_bots = false;
+    bool is_guard = false;
   };
   static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
   UserInfo *add_user_info(int64 user_id);
@@ -1103,6 +1120,7 @@ class Client final : public WebhookActor::Callback {
     int64 linked_chat_id = 0;
     int64 direct_messages_chat_id = 0;
     int64 paid_message_star_count = 0;
+    int64 guard_bot_user_id = 0;
     object_ptr<td_api::chatLocation> location;
     object_ptr<td_api::ChatMemberStatus> status;
     bool is_supergroup = false;
@@ -1238,6 +1256,8 @@ class Client final : public WebhookActor::Callback {
   static td::vector<int64> get_sent_gift_sticker_set_ids(const object_ptr<td_api::SentGift> &gift);
 
   static td::vector<int64> get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content);
+
+  static td::vector<int64> get_poll_media_sticker_set_ids(const object_ptr<td_api::PollMedia> &media);
 
   static td::vector<int64> get_message_sticker_set_ids(const MessageInfo *message_info);
 
@@ -1445,6 +1465,10 @@ class Client final : public WebhookActor::Callback {
   static bool is_chat_member(const object_ptr<td_api::ChatMemberStatus> &status);
 
   static td::string get_chat_member_status(const object_ptr<td_api::ChatMemberStatus> &status);
+
+  static td::string get_date_time_format(const object_ptr<td_api::DateTimeFormattingType> &formatting_type);
+
+  static td::Result<object_ptr<td_api::DateTimeFormattingType>> get_date_time_formatting_type(td::Slice format);
 
   static td::string get_passport_element_type(int32 id);
 
